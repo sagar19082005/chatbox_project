@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: chatbox-project
+    env: node
+    branch: master
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars: []
