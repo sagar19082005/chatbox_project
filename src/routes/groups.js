@@ -12,13 +12,13 @@ module.exports = function createGroupsRouter(io) {
     const { groupName, password } = req.body;
     if (!groupName || !password) return res.status(400).json({ error: 'groupName and password required' });
     try {
-      const [existing] = await db.query('SELECT id FROM `groups` WHERE group_name = ?', [groupName]);
+      const [existing] = await db.query('SELECT id FROM groups WHERE group_name = $1', [groupName]);
       if (existing.length) return res.status(409).json({ error: 'Group name already exists' });
 
       const hashed = await bcrypt.hash(password, 10);
       const adminToken = crypto.randomBytes(32).toString('hex');
-      const [result] = await db.query('INSERT INTO `groups` (group_name, password, created_at, admin_token) VALUES (?, ?, NOW(), ?)', [groupName, hashed, adminToken]);
-      return res.json({ success: true, groupId: result.insertId, adminToken });
+      const [result] = await db.query('INSERT INTO groups (group_name, password, created_at, admin_token) VALUES ($1, $2, NOW(), $3) RETURNING id', [groupName, hashed, adminToken]);
+      return res.json({ success: true, groupId: result[0].id, adminToken });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: 'internal' });
@@ -30,7 +30,7 @@ module.exports = function createGroupsRouter(io) {
     const { groupName, password } = req.body;
     if (!groupName || !password) return res.status(400).json({ error: 'groupName and password required' });
     try {
-      const [rows] = await db.query('SELECT id, password FROM `groups` WHERE group_name = ?', [groupName]);
+      const [rows] = await db.query('SELECT id, password FROM groups WHERE group_name = $1', [groupName]);
       if (!rows.length) return res.status(404).json({ error: 'Group not found' });
       const group = rows[0];
       const match = await bcrypt.compare(password, group.password);
@@ -47,7 +47,7 @@ module.exports = function createGroupsRouter(io) {
     const { groupId, adminToken, targetName } = req.body;
     if (!groupId || !adminToken || !targetName) return res.status(400).json({ error: 'groupId, adminToken and targetName required' });
     try {
-      const [rows] = await db.query('SELECT id FROM `groups` WHERE id = ? AND admin_token = ?', [groupId, adminToken]);
+      const [rows] = await db.query('SELECT id FROM groups WHERE id = $1 AND admin_token = $2', [groupId, adminToken]);
       if (!rows.length) return res.status(403).json({ error: 'Unauthorized' });
 
       const room = `group_${groupId}`;
@@ -74,9 +74,9 @@ module.exports = function createGroupsRouter(io) {
     const { adminToken } = req.body;
     if (!groupId || !adminToken) return res.status(400).json({ error: 'groupId and adminToken required' });
     try {
-      const [rows] = await db.query('SELECT id FROM `groups` WHERE id = ? AND admin_token = ?', [groupId, adminToken]);
+      const [rows] = await db.query('SELECT id FROM groups WHERE id = $1 AND admin_token = $2', [groupId, adminToken]);
       if (!rows.length) return res.status(403).json({ error: 'Unauthorized' });
-      await db.query('DELETE FROM `messages` WHERE group_id = ?', [groupId]);
+      await db.query('DELETE FROM messages WHERE group_id = $1', [groupId]);
       // notify room that messages were deleted
       const room = `group_${groupId}`;
       io.to(room).emit('messages_deleted');

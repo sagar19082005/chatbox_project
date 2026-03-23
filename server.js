@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ensure admin_token column exists for current DB
 async function ensureAdminColumn() {
   try {
-    await db.query("ALTER TABLE `groups` ADD COLUMN IF NOT EXISTS admin_token VARCHAR(128)");
+    await db.query('ALTER TABLE groups ADD COLUMN IF NOT EXISTS admin_token VARCHAR(128)');
   } catch (err) {
     // some MySQL versions don't support IF NOT EXISTS for ADD COLUMN — handle gracefully
     if (err && err.errno) console.warn('Could not run ALTER TABLE to add admin_token (it may already exist)');
@@ -42,7 +42,7 @@ io.on('connection', (socket) => {
 
     // send existing messages
     try {
-      const [rows] = await db.query('SELECT sender_name, message_text, timestamp FROM `messages` WHERE group_id = ? ORDER BY timestamp ASC', [groupId]);
+      const [rows] = await db.query('SELECT sender_name, message_text, timestamp FROM messages WHERE group_id = $1 ORDER BY timestamp ASC', [groupId]);
       socket.emit('init_messages', rows);
     } catch (err) {
       console.error('Error fetching messages', err);
@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
     if (!groupId || !messageText) return;
     const room = `group_${groupId}`;
     try {
-      await db.query('INSERT INTO messages (group_id, sender_name, message_text, timestamp) VALUES (?, ?, ?, NOW())', [groupId, senderName || 'Anonymous', messageText]);
+      await db.query('INSERT INTO messages (group_id, sender_name, message_text, timestamp) VALUES ($1, $2, $3, NOW())', [groupId, senderName || 'Anonymous', messageText]);
       const payload = { sender_name: senderName || 'Anonymous', message_text: messageText, timestamp: new Date() };
       io.to(room).emit('new_message', payload);
     } catch (err) {
